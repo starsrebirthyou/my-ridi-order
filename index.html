@@ -225,6 +225,18 @@
     padding:2px 6px;
     cursor:pointer;
   }
+  /* PDF/이미지 캡처 시 <select>는 html2canvas가 내부 텍스트를 제대로
+     그리지 못해서, 캡처 직전에만 이 라벨로 잠깐 바꿔치기한다. */
+  .cat-label-print{
+    font-family:'Noto Sans KR',sans-serif;
+    font-size:10.5px;
+    border:1px solid var(--paper-line);
+    background:var(--paper-deep);
+    color:var(--ink-soft);
+    border-radius:10px;
+    padding:2px 8px;
+    white-space:nowrap;
+  }
 
   .grand{
     margin-top:26px; padding-top:14px; border-top:2px solid var(--ink);
@@ -699,6 +711,28 @@ function handleFiles(fileListObj){
   });
 }
 
+// html2canvas는 네이티브 <select>의 내부 텍스트를 제대로 캡처하지 못하므로,
+// PDF/이미지로 저장하는 순간에만 선택된 값을 보여주는 일반 텍스트로 잠깐 바꿔둔다.
+function swapSelectsForCapture(root){
+  const selects = Array.from(root.querySelectorAll('select'));
+  const swapped = selects.map(sel=>{
+    const label = document.createElement('span');
+    label.className = 'cat-label-print';
+    const opt = sel.options[sel.selectedIndex];
+    label.textContent = opt ? opt.textContent : '';
+    sel.insertAdjacentElement('afterend', label);
+    sel.style.display = 'none';
+    return { sel, label };
+  });
+  return swapped;
+}
+function restoreSelectsAfterCapture(swapped){
+  swapped.forEach(({sel, label})=>{
+    label.remove();
+    sel.style.display = '';
+  });
+}
+
 document.getElementById('dlCardBtn').addEventListener('click', async ()=>{
   const btn = document.getElementById('dlCardBtn');
   const original = btn.textContent;
@@ -728,11 +762,13 @@ document.getElementById('dlPdfBtn').addEventListener('click', async ()=>{
   btn.disabled = true; btn.textContent = '만드는 중...';
   // PDF에는 업로드 UI(도움말, 드롭존, 파일목록, 버튼 등)가 아니라
   // 영수증 카드 + 항목 내역만 들어가야 하므로, 캡처 직전에만 숨긴다.
+  const node = document.querySelector('.receipt');
   const hideEls = Array.from(document.querySelectorAll('.receipt .no-print'));
   const prevDisplay = hideEls.map(el => el.style.display);
   hideEls.forEach(el => { el.style.display = 'none'; });
+  // <select> 드롭다운은 html2canvas가 제대로 못 그리므로 텍스트 라벨로 잠깐 교체
+  const swapped = swapSelectsForCapture(node);
   try{
-    const node = document.querySelector('.receipt');
     const canvas = await html2canvas(node, {
       scale: 1.5,
       backgroundColor: '#EFE6D3',
@@ -740,29 +776,23 @@ document.getElementById('dlPdfBtn').addEventListener('click', async ()=>{
     });
     const imgData = canvas.toDataURL('image/jpeg', 0.92);
     const { jsPDF } = window.jspdf;
-    const pageWidth = 595.28; // A4 pt
-    const pageHeight = 841.89;
-    const imgWidth = pageWidth - 40;
+    // 페이지를 나누지 않고, 영수증 전체 길이에 맞춘 세로로 긴 단일 페이지로 생성한다.
+    // (여러 페이지로 나누면 항목이 페이지 경계에서 잘리거나 중복 표시되는 문제가 있었음)
+    const margin = 20;
+    const imgWidth = 555.28; // A4 너비(595.28pt) - 좌우 여백
     const imgHeight = (canvas.height * imgWidth) / canvas.width;
-    const pdf = new jsPDF('p', 'pt', 'a4');
-    const alias = 'ridi-ledger-capture'; // reuse the same decoded image across pages instead of re-embedding it each time
-
-    let heightLeft = imgHeight;
-    let position = 20;
-    pdf.addImage(imgData, 'JPEG', 20, position, imgWidth, imgHeight, alias, 'FAST');
-    heightLeft -= (pageHeight - 40);
-
-    while (heightLeft > 0){
-      position = heightLeft - imgHeight + 20;
-      pdf.addPage();
-      pdf.addImage(imgData, 'JPEG', 20, position, imgWidth, imgHeight, alias, 'FAST');
-      heightLeft -= (pageHeight - 40);
-    }
-    pdf.save('리디-구매내역.pdf');
+    const pdf = new jsPDF({
+      orientation: 'p',
+      unit: 'pt',
+      format: [imgWidth + margin * 2, imgHeight + margin * 2]
+    });
+    pdf.addImage(imgData, 'JPEG', margin, margin, imgWidth, imgHeight, undefined, 'FAST');
+    pdf.save('구매내역-정리.pdf');
   }catch(e){
     console.error(e);
     alert('PDF 생성에 실패했어요. 항목 수가 아주 많다면 나눠서 다시 시도해보세요.');
   } finally {
+    restoreSelectsAfterCapture(swapped);
     hideEls.forEach((el, i) => { el.style.display = prevDisplay[i]; });
   }
   btn.disabled = false; btn.textContent = original;
