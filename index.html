@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>리디 결제 장부</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Nanum+Myeongjo:wght@400;700;800&family=Noto+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#EFE6D3;
+    --paper-deep:#E3D6B8;
+    --paper-line:#C9BC9C;
+    --ink:#262220;
+    --ink-soft:#6B6152;
+    --stamp:#9B2E28;
+    --stamp-soft:#c65b4e33;
+    --ok:#4b6a53;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:#d8cfb6;
+    background-image:
+      radial-gradient(circle at 20% 10%, rgba(255,255,255,0.25), transparent 40%),
+      radial-gradient(circle at 80% 90%, rgba(0,0,0,0.05), transparent 40%);
+    min-height:100vh;
+    padding:40px 16px;
+    font-family:'Noto Sans KR', sans-serif;
+    color:var(--ink);
+  }
+  .receipt{
+    max-width:640px;
+    margin:0 auto;
+    background:var(--paper);
+    background-image:
+      repeating-linear-gradient(180deg, rgba(0,0,0,0.015) 0px, rgba(0,0,0,0.015) 1px, transparent 1px, transparent 3px);
+    box-shadow:0 30px 60px -20px rgba(30,20,10,0.35), 0 2px 0 rgba(0,0,0,0.05);
+    position:relative;
+    padding:44px 34px 30px;
+  }
+  .receipt::before, .receipt::after{
+    content:"";
+    position:absolute; left:0; right:0; height:14px;
+    background:
+      radial-gradient(circle at 8px 7px, transparent 7px, var(--paper) 7.5px) repeat-x;
+    background-size:16px 14px;
+  }
+  .receipt::before{ top:-7px; }
+  .receipt::after{ bottom:-7px; transform:rotate(180deg); }
+
+  .eyebrow{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11px;
+    letter-spacing:0.25em;
+    color:var(--ink-soft);
+    text-align:center;
+    text-transform:uppercase;
+  }
+  h1{
+    font-family:'Nanum Myeongjo', serif;
+    font-weight:800;
+    font-size:30px;
+    text-align:center;
+    margin:6px 0 2px;
+    letter-spacing:0.02em;
+  }
+  .sub{
+    text-align:center;
+    font-size:12.5px;
+    color:var(--ink-soft);
+    margin-bottom:6px;
+  }
+  .disclaimer{
+    text-align:center;
+    font-size:10.5px;
+    color:var(--ink-soft);
+    opacity:0.75;
+    margin-bottom:22px;
+    font-family:'IBM Plex Mono', monospace;
+  }
+  .cut{
+    text-align:center;
+    color:var(--paper-line);
+    font-size:12px;
+    letter-spacing:2px;
+    margin:22px 0;
+    user-select:none;
+  }
+
+  .help{
+    margin-bottom:22px; border:1px solid var(--paper-line); border-radius:2px;
+    background:rgba(0,0,0,0.015);
+  }
+  .help summary{
+    cursor:pointer; padding:10px 14px; font-size:12.5px; font-weight:600;
+    color:var(--ink-soft); list-style:none; user-select:none;
+  }
+  .help summary::-webkit-details-marker{ display:none; }
+  .help summary:hover{ color:var(--stamp); }
+  .help[open] summary{ border-bottom:1px dashed var(--paper-line); }
+  .help-body{ padding:14px 16px 18px; font-size:12.5px; line-height:1.75; }
+  .help-body h3{
+    font-family:'Nanum Myeongjo', serif; font-size:13.5px; margin:16px 0 6px;
+  }
+  .help-body h3:first-child{ margin-top:0; }
+  .help-body p{ margin:6px 0; color:var(--ink); }
+  .help-body ul{ margin:6px 0; padding-left:18px; }
+  .help-body li{ margin:4px 0; }
+  .help-body .mono{ font-family:'IBM Plex Mono',monospace; font-size:11.5px; background:var(--paper-deep); padding:1px 4px; border-radius:2px; }
+  .help-body .hint{ font-size:11.5px; color:var(--ink-soft); }
+  .prompt-box{ position:relative; margin:8px 0; }
+  .prompt-box pre{
+    white-space:pre-wrap; font-family:'IBM Plex Mono',monospace; font-size:11px;
+    background:var(--paper-deep); border:1px solid var(--paper-line); border-radius:2px;
+    padding:12px 12px 14px; margin:0; line-height:1.6; color:var(--ink);
+  }
+  .copy-btn{
+    position:absolute; top:8px; right:8px; font-family:'IBM Plex Mono',monospace;
+    font-size:10.5px; border:1px solid var(--paper-line); background:var(--paper);
+    color:var(--ink-soft); border-radius:3px; padding:3px 8px; cursor:pointer;
+  }
+  .copy-btn:hover{ border-color:var(--stamp); color:var(--stamp); }
+
+  /* upload zone */
+  .drop{
+    border:1.5px dashed var(--paper-line);
+    border-radius:2px;
+    padding:26px 18px;
+    text-align:center;
+    cursor:pointer;
+    transition:border-color .15s, background .15s;
+  }
+  .drop:hover, .drop.drag{
+    border-color:var(--stamp);
+    background:rgba(155,46,40,0.04);
+  }
+  .drop .big{ font-size:15px; font-weight:600; margin-bottom:4px; }
+  .drop .small{ font-size:12px; color:var(--ink-soft); line-height:1.6; }
+  .drop input{ display:none; }
+
+  .filelist{ margin-top:14px; display:flex; flex-wrap:wrap; gap:8px; }
+  .chip{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11.5px;
+    background:var(--paper-deep);
+    border:1px solid var(--paper-line);
+    padding:5px 9px 5px 11px;
+    border-radius:20px;
+    display:flex; align-items:center; gap:6px;
+  }
+  .chip button{
+    border:none; background:none; cursor:pointer; color:var(--stamp);
+    font-size:13px; line-height:1; padding:0;
+  }
+
+  .empty-hint{
+    margin-top:16px; font-size:12px; color:var(--ink-soft); line-height:1.9;
+    background:rgba(0,0,0,0.02); border-left:2px solid var(--paper-line);
+    padding:12px 14px;
+  }
+  .empty-hint b{ color:var(--ink); }
+
+  /* stamp total */
+  .stamp-wrap{ display:flex; justify-content:center; margin:30px 0 8px; }
+  .stamp{
+    width:172px; height:172px; border-radius:50%;
+    border:3px solid var(--stamp);
+    color:var(--stamp);
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    transform:rotate(-6deg);
+    position:relative;
+    animation:stampIn .35s ease-out;
+  }
+  .stamp::before{
+    content:""; position:absolute; inset:7px; border:1px solid var(--stamp); border-radius:50%; opacity:0.55;
+  }
+  @keyframes stampIn{
+    from{ transform:rotate(-6deg) scale(0.85); opacity:0; }
+    to{ transform:rotate(-6deg) scale(1); opacity:1; }
+  }
+  .stamp .label{ font-family:'IBM Plex Mono',monospace; font-size:10.5px; letter-spacing:0.15em; margin-bottom:4px;}
+  .stamp .amt{ font-family:'Nanum Myeongjo', serif; font-weight:800; font-size:24px; }
+  .stamp .cnt{ font-family:'IBM Plex Mono',monospace; font-size:9.5px; margin-top:4px; opacity:0.85;}
+
+  .excluded-note{
+    text-align:center; font-size:11.5px; color:var(--ink-soft); margin-bottom:6px;
+    font-family:'IBM Plex Mono', monospace;
+  }
+
+  .summary{ margin:22px 0 4px; }
+  .sum-row{
+    display:flex; align-items:baseline; gap:8px; padding:5px 0;
+    font-size:13.5px;
+  }
+  .sum-row .name{ white-space:nowrap; font-weight:600; }
+  .leader{ flex:1; border-bottom:1px dotted var(--paper-line); height:0.5em; }
+  .sum-row .val{ font-family:'IBM Plex Mono',monospace; white-space:nowrap; font-size:13px; }
+  .sum-row .pct{ font-family:'IBM Plex Mono',monospace; font-size:10.5px; color:var(--ink-soft); width:34px; text-align:right; }
+
+  .section{ margin-top:26px; }
+  .section-head{
+    display:flex; align-items:center; gap:10px; margin-bottom:10px;
+  }
+  .section-head h2{
+    font-family:'Nanum Myeongjo', serif; font-size:16px; font-weight:700; margin:0; white-space:nowrap;
+  }
+  .section-head .hl{ flex:1; height:1px; background:var(--paper-line); }
+  .section-head .total{ font-family:'IBM Plex Mono',monospace; font-size:12.5px; color:var(--stamp); font-weight:600; white-space:nowrap; }
+
+  .item{
+    display:flex; align-items:flex-start; gap:8px; padding:7px 0;
+    border-bottom:1px dashed rgba(0,0,0,0.06);
+    font-size:13px;
+  }
+  .item .title{ flex:1; line-height:1.4; }
+  .item .meta{ font-size:10.5px; color:var(--ink-soft); margin-top:2px; font-family:'IBM Plex Mono',monospace;}
+  .item .price{ font-family:'IBM Plex Mono',monospace; font-size:13px; white-space:nowrap; padding-top:1px;}
+  .item select{
+    font-family:'Noto Sans KR',sans-serif;
+    font-size:10.5px;
+    border:1px solid var(--paper-line);
+    background:var(--paper-deep);
+    color:var(--ink-soft);
+    border-radius:10px;
+    padding:2px 6px;
+    cursor:pointer;
+  }
+
+  .grand{
+    margin-top:26px; padding-top:14px; border-top:2px solid var(--ink);
+    display:flex; justify-content:space-between; align-items:baseline;
+    font-family:'Nanum Myeongjo', serif;
+  }
+  .grand .k{ font-size:15px; font-weight:700; }
+  .grand .v{ font-family:'IBM Plex Mono',monospace; font-size:19px; font-weight:600; }
+
+  #summaryCard{
+    background:var(--paper);
+    padding:26px 6px 20px;
+    position:relative;
+  }
+  #summaryCard::before, #summaryCard::after{
+    content:"";
+    position:absolute; left:-4px; right:-4px; height:12px;
+    background:
+      radial-gradient(circle at 7px 6px, transparent 6.5px, var(--paper) 7px) repeat-x;
+    background-size:14px 12px;
+  }
+  #summaryCard::before{ top:-6px; }
+  #summaryCard::after{ bottom:-6px; transform:rotate(180deg); }
+
+  .rcpt-store{
+    text-align:center; font-family:'Nanum Myeongjo', serif; font-weight:800;
+    font-size:22px; letter-spacing:0.06em;
+  }
+  .rcpt-sub{
+    text-align:center; font-size:11.5px; color:var(--ink-soft);
+    letter-spacing:0.2em; margin-top:2px;
+  }
+  .rcpt-meta{
+    display:flex; justify-content:space-between; margin:14px 2px 0;
+    font-family:'IBM Plex Mono', monospace; font-size:10.5px; color:var(--ink-soft);
+  }
+  .rcpt-rule{ border-top:1.5px solid var(--ink); margin:12px 0; opacity:0.85; }
+  .rcpt-rule.dashed{ border-top:1px dashed var(--paper-line); border-top-style:dashed; border-top-color:var(--paper-line); border-top-width:1px; opacity:1; }
+  .rcpt-col-head{
+    display:flex; justify-content:space-between;
+    font-family:'IBM Plex Mono', monospace; font-size:10px; color:var(--ink-soft);
+    letter-spacing:0.08em; margin-bottom:6px; padding:0 2px;
+  }
+  .rcpt-thanks{
+    text-align:center; font-size:11px; letter-spacing:0.15em; color:var(--ink-soft);
+    margin-top:16px;
+  }
+  .rcpt-barcode{ display:flex; justify-content:center; margin-top:10px; }
+  .barcode-num{
+    text-align:center; font-family:'IBM Plex Mono',monospace; font-size:10px;
+    letter-spacing:0.25em; color:var(--ink-soft); margin-top:4px;
+  }
+  .card-title{
+    text-align:center; font-family:'IBM Plex Mono',monospace; font-size:10px;
+    letter-spacing:0.2em; color:var(--ink-soft); margin-bottom:4px;
+  }
+  .card-date{
+    text-align:center; font-family:'IBM Plex Mono',monospace; font-size:10px;
+    color:var(--ink-soft); margin-top:8px; letter-spacing:0.05em;
+  }
+  .card-disclaimer{
+    text-align:center; font-family:'IBM Plex Mono',monospace; font-size:9px;
+    color:var(--ink-soft); opacity:0.7; margin-top:3px; letter-spacing:0.02em;
+  }
+  .dl-row{ display:flex; gap:8px; margin:18px 0 6px; }
+  .dl-btn{
+    flex:1; font-family:'IBM Plex Mono', monospace; font-size:11.5px;
+    padding:9px 6px; border:1px solid var(--paper-line); background:var(--paper-deep);
+    color:var(--ink); cursor:pointer; border-radius:3px;
+  }
+  .dl-btn:hover{ border-color:var(--stamp); color:var(--stamp); }
+  .dl-btn:disabled{ opacity:0.5; cursor:wait; }
+
+  .footer-note{
+    margin-top:20px; text-align:center; font-size:10.5px; color:var(--ink-soft);
+    font-family:'IBM Plex Mono',monospace; letter-spacing:0.05em;
+  }
+  .reset{
+    display:block; margin:18px auto 0; background:none; border:1px solid var(--paper-line);
+    color:var(--ink-soft); font-size:11px; padding:6px 14px; border-radius:20px; cursor:pointer;
+    font-family:'IBM Plex Mono',monospace;
+  }
+  .reset:hover{ border-color:var(--stamp); color:var(--stamp); }
+
+  @media (max-width:480px){
+    .receipt{ padding:34px 18px 24px; }
+    h1{ font-size:24px; }
+    .stamp{ width:150px; height:150px; }
+  }
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body>
+<div class="receipt">
+  <div class="eyebrow">RIDIBOOKS · ORDER LEDGER</div>
+  <h1>리디 결제 장부</h1>
+  <div class="sub">저장한 결제내역 html을 올리면 총 금액과 카테고리별 금액을 확인할 수 있습니다.</div>
+
+  <details class="help no-print">
+    <summary>❔ 사용법 / 도움말 펼치기</summary>
+    <div class="help-body">
+      <h3>1. 데이터 넣는 방법</h3>
+      <p>
+        이 페이지는 <b>HTML 파일 업로드만</b> 지원합니다. 리디 <span class="mono">마이리디 → 결제 내역</span>
+        페이지를 브라우저에서 Ctrl+S(다른 이름으로 저장)한 뒤 올려주세요. 결제내역은 페이지가 나뉘어 있어서
+        (1, 2, 3페이지…) 전체를 보려면 각 페이지를 따로 저장해서 한 번에 여러 개 올리면 됩니다. 이때 페이지를 하나하나 저장하는 것이기 때문에 매우 귀찮으실 수 있습니다. 만약 Claude AI를 구독중이시라면 2번째 방법을 추천드립니다.
+      </p>
+
+      <h3>2. Claude in Chrome으로 긁어올 때 (프롬프트 복사해서 사용하세요)</h3>
+      <p>이 방법은 Claude AI Pro 이상을 구독하고 계신 분들께 추천드립니다. 무료 버전은 Claude in Chrome을 사용할 수 없습니다.</p>
+      <div class="prompt-box">
+        <button class="copy-btn" id="copyPrompt">복사</button>
+        <pre id="chromePrompt">리디북스 ridibooks.com/order/history 페이지 결제내역을 긁어줘.
+1페이지부터 마지막 페이지까지 순서대로 이동하면서 각 행의 날짜, 제목, 금액, 결제수단을 수집해줘.
+가공(필터링, 합산)은 하지 말고 원본 그대로 사용할 거야.
+
+수집한 데이터를 아래와 똑같은 &lt;table&gt; 구조를 가진 HTML 파일로 만들어서 저장해줘.
+행 순서는 각 td에 날짜, 제목, 금액, 결제수단 순서로 넣어줘 (금액은 "1,000원"처럼 숫자+원 형태 그대로 둬도 돼).
+
+&lt;!DOCTYPE html&gt;
+&lt;html&gt;&lt;body&gt;
+&lt;table class="buy_history_table"&gt;
+  &lt;tbody&gt;
+    &lt;tr&gt;&lt;td&gt;2026.07.14. 18:10&lt;/td&gt;&lt;td&gt;하나의 더치 80화&lt;/td&gt;&lt;td&gt;100원&lt;/td&gt;&lt;td&gt;리디포인트&lt;/td&gt;&lt;/tr&gt;
+    &lt;!-- 수집한 행마다 위와 같은 형식으로 tr을 추가 --&gt;
+  &lt;/tbody&gt;
+&lt;/table&gt;
+&lt;/body&gt;&lt;/html&gt;
+
+완성되면 파일로 저장해서 다운로드해줘 (예: my-ridi-order.html).</pre>
+      </div>
+      <p class="hint">
+        필터링(0원 제외, "기다리면 무료" 제외)과 회차 합산은 이 페이지가 알아서 처리해줍니다.
+        Chrome에는 <b>원본만 그대로, 위 표 형식 그대로</b> 담아달라고 하는 걸 추천해요.
+        완성된 HTML 파일을 다운로드한 뒤 위 업로드 칸에 그대로 올리면 바로 인식됩니다.
+      </p>
+
+      <h3>3. 자동으로 처리되는 것들</h3>
+      <ul>
+        <li>결제수단이 "기다리면 무료"인 항목, 금액 0원인 항목 → 자동 제외 (건수는 표시)</li>
+        <li>제목이 "OO화"로 끝나는 항목 → 같은 작품끼리 자동으로 묶어서 금액 합산</li>
+        <li>카테고리(단행본/웹툰/웹소설/기타)는 "화" 패턴으로 1차 추정 후, 항목별 드롭다운으로 직접 수정 가능</li>
+      </ul>
+
+      <h3>4. 데이터는 어디에 저장되나요</h3>
+      <p>
+        업로드한 파일은 <b>서버로 전송되지 않고 사용자의 브라우저 안에서만</b> 처리됩니다.
+        카테고리 수정 내역만 이 브라우저의 로컬 저장소에 남고 새로고침하면 초기화됩니다. 단, 업로드한
+        원본 파일 자체는 저장되지 않으니 다시 열면 파일을 다시 올려야 해요.
+      </p>
+    </div>
+  </details>
+
+  <div class="drop no-print" id="drop">
+    <div class="big">📖 결제내역 HTML 파일을 올려주세요</div>
+    <div class="small">
+      리디 &gt; 마이리디 &gt; 결제 내역 페이지에서 Ctrl+S(다른 이름으로 저장)한 파일<br>
+      여러 페이지(1,2,3…)를 저장했다면 한 번에 여러 개 올려도 됩니다<br>
+      <span style="opacity:0.7">클릭하거나 이 위에 파일을 끌어다 놓으세요</span>
+    </div>
+    <input type="file" id="fileInput" accept=".html,.htm" multiple>
+  </div>
+  <div class="filelist no-print" id="filelist"></div>
+
+  <div id="emptyHint" class="empty-hint no-print">
+    <b>0원 처리된 항목</b> (기다리면 무료, 프로모션 등)은 자동으로 총액에서 제외합니다.<br>
+    리디 결제내역 표에는 <b>단행본/웹툰/웹소설 구분이 따로 없어서</b>, 제목의 "OO화" 패턴으로 웹툰/웹소설을 추정하고
+    나머지는 단행본으로 가정해 뒀으니 각 항목 옆의 드롭다운으로 직접 수정하실 수 있습니다.</div>
+  </div>
+
+  <div id="results" style="display:none;">
+    <div id="summaryCard">
+      <div class="rcpt-store">RIDIBOOKS</div>
+      <div class="rcpt-sub">구 매 내 역 영 수 증</div>
+      <div class="rcpt-meta">
+        <span>NO. <span id="rcptNo">000000</span></span>
+        <span id="rcptDate"></span>
+      </div>
+      <div class="rcpt-rule"></div>
+
+      <div class="stamp-wrap">
+        <div class="stamp">
+          <div class="label">TOTAL PAID</div>
+          <div class="amt" id="grandAmt">₩0</div>
+          <div class="cnt" id="grandCnt">0건</div>
+        </div>
+      </div>
+      <div class="excluded-note" id="excludedNote"></div>
+
+      <div class="rcpt-rule dashed"></div>
+      <div class="rcpt-col-head">
+        <span>구분</span><span>결제 비중</span><span>금액</span>
+      </div>
+      <div class="summary" id="catSummary"></div>
+      <div class="rcpt-rule"></div>
+
+      <div class="rcpt-thanks">이 용 해 주 셔 서 감 사 합 니 다</div>
+      <div class="rcpt-barcode">
+        <svg id="barcodeSvg" width="200" height="34" viewBox="0 0 200 34" xmlns="http://www.w3.org/2000/svg"></svg>
+      </div>
+      <div class="barcode-num" id="barcodeNum"></div>
+      <div class="card-date">리디 결제 장부 · ridi-ledger</div>
+      <div class="card-disclaimer">RIDIBOOKS와 무관한 개인 제작 비공식 도구입니다</div>
+    </div>
+
+    <div class="dl-row no-print">
+      <button class="dl-btn" id="dlCardBtn">🧾 요약 카드 PNG로 저장</button>
+      <button class="dl-btn" id="dlPdfBtn">📄 전체 내역 PDF로 저장</button>
+    </div>
+
+    <div id="sections"></div>
+
+    <div class="grand">
+      <span class="k">총 결제액</span>
+      <span class="v" id="grandAmt2">₩0</span>
+    </div>
+
+    <button class="reset no-print" id="resetBtn">전체 초기화</button>
+  </div>
+
+  <div class="footer-note no-print">✂ - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</div>
+</div>
+
+<script>
+const CATS = ['단행본','웹툰','웹소설','기타'];
+let uploadedFiles = []; // {name, text}
+let items = [];         // flat parsed rows (deduped)
+let categoryMap = {};   // seriesKey -> category
+
+function fmtWon(n){ return '₩' + n.toLocaleString('ko-KR'); }
+
+// 실제 막대(rect)를 그려서 바코드를 만든다. CSS 배경 그라디언트는
+// html2canvas로 캡처할 때 제대로 렌더링되지 않아서 SVG 방식으로 대체함.
+function renderBarcode(){
+  const svg = document.getElementById('barcodeSvg');
+  if (!svg) return;
+  const NS = 'http://www.w3.org/2000/svg';
+  while (svg.firstChild) svg.removeChild(svg.firstChild);
+
+  const width = 200, height = 34, quiet = 4;
+  const barColor = '#262220';
+  let x = quiet;
+  const widths = [1, 1, 1, 2, 2, 3];
+
+  while (x < width - quiet) {
+    const w = widths[Math.floor(Math.random() * widths.length)];
+    const isBar = Math.random() > 0.45;
+    if (isBar) {
+      const rect = document.createElementNS(NS, 'rect');
+      rect.setAttribute('x', x);
+      rect.setAttribute('y', 1);
+      rect.setAttribute('width', w);
+      rect.setAttribute('height', height - 2);
+      rect.setAttribute('fill', barColor);
+      svg.appendChild(rect);
+    }
+    x += w + (Math.random() > 0.5 ? 1 : 2);
+  }
+
+  // 바코드 아래 표시되는 랜덤 12자리 숫자
+  let num = '';
+  for (let i = 0; i < 12; i++) num += Math.floor(Math.random() * 10);
+  const numEl = document.getElementById('barcodeNum');
+  if (numEl) numEl.textContent = num.replace(/(\d{4})(?=\d)/g, '$1 ');
+}
+
+function extractSeries(title){
+  let t = title.trim();
+  t = t.replace(/\s*\(대여\)\s*$/,'').trim();
+  let m = t.match(/^(.*?)(?:\s+제?\d+(?:\.\d+)?\s*(?:화|권|회))(?:\s*\([^)]*\))?\s*$/);
+  if (m && m[1].trim().length>0) return m[1].trim();
+  m = t.match(/^(.*?)\s*\((?:작품\s*노트|외전|특별판|번외편?|프롤로그)\)\s*$/);
+  if (m && m[1].trim().length>0) return m[1].trim();
+  return t;
+}
+
+function suggestCategory(title){
+  if (/\d+\s*화/.test(title)) return '웹툰';
+  if (/\d+\s*권/.test(title)) return '단행본';
+  return '단행본';
+}
+
+function parseHTML(text){
+  const doc = new DOMParser().parseFromString(text, 'text/html');
+  const table = doc.querySelector('table.buy_history_table') || doc.querySelector('table');
+  if (!table) return [];
+  const rows = table.querySelectorAll('tbody tr');
+  const out = [];
+  rows.forEach(r=>{
+    const tds = r.querySelectorAll('td');
+    if (tds.length < 4) return;
+    const date = tds[0].textContent.trim().replace(/\s+/g,' ');
+    const title = tds[1].textContent.trim().replace(/\s+/g,' ');
+    const priceNum = parseInt((tds[2].textContent||'').replace(/[^0-9]/g,'') || '0', 10);
+    const payType = tds[3].textContent.trim().replace(/\s+/g,' ');
+    const href = r.getAttribute('data-href') || (date+'|'+title+'|'+priceNum);
+    out.push({id:href, date, title, price:priceNum, payType});
+  });
+  return out;
+}
+
+// window.storage only exists inside Claude.ai artifacts. When this file runs
+// standalone (e.g. GitHub Pages), fall back to localStorage automatically.
+const hasClaudeStorage = typeof window.storage !== 'undefined';
+
+async function loadCategoryMap(){
+  try{
+    if (hasClaudeStorage){
+      const res = await window.storage.get('ridi-category-map', false);
+      if (res && res.value) categoryMap = JSON.parse(res.value);
+    } else {
+      const raw = localStorage.getItem('ridi-category-map');
+      if (raw) categoryMap = JSON.parse(raw);
+    }
+  }catch(e){ categoryMap = {}; }
+}
+async function saveCategoryMap(){
+  try{
+    if (hasClaudeStorage){
+      await window.storage.set('ridi-category-map', JSON.stringify(categoryMap), false);
+    } else {
+      localStorage.setItem('ridi-category-map', JSON.stringify(categoryMap));
+    }
+  }catch(e){ console.error('저장 실패', e); }
+}
+
+function renderFileList(){
+  const fl = document.getElementById('filelist');
+  fl.innerHTML = '';
+  uploadedFiles.forEach((f, i)=>{
+    const chip = document.createElement('div');
+    chip.className = 'chip';
+    chip.innerHTML = `<span>${f.name}</span>`;
+    const btn = document.createElement('button');
+    btn.textContent = '✕';
+    btn.onclick = ()=>{ uploadedFiles.splice(i,1); renderFileList(); reprocess(); };
+    chip.appendChild(btn);
+    fl.appendChild(chip);
+  });
+}
+
+function reprocess(){
+  const map = new Map();
+  uploadedFiles.forEach(f=>{
+    parseHTML(f.text).forEach(row=>{ map.set(row.id, row); });
+  });
+  items = Array.from(map.values());
+  render();
+}
+
+function render(){
+  const hasData = items.length > 0;
+  document.getElementById('emptyHint').style.display = hasData ? 'none' : 'block';
+  document.getElementById('results').style.display = hasData ? 'block' : 'none';
+  if (!hasData) return;
+
+  const isFreeWait = it => /기다리면\s*무료/.test(it.payType || '');
+  const paid = items.filter(it=> it.price > 0 && !isFreeWait(it));
+  const free = items.filter(it=> it.price === 0 || isFreeWait(it));
+
+  // group by series
+  const groups = {}; // seriesKey -> {title, total, count, dates:[], payTypes:Set}
+  paid.forEach(it=>{
+    const key = extractSeries(it.title);
+    if (!groups[key]) groups[key] = { title:key, total:0, count:0, payTypes:new Set() };
+    groups[key].total += it.price;
+    groups[key].count += 1;
+    groups[key].payTypes.add(it.payType);
+  });
+
+  Object.keys(groups).forEach(key=>{
+    if (!(key in categoryMap)) categoryMap[key] = suggestCategory(key);
+  });
+
+  const grandTotal = paid.reduce((s,it)=>s+it.price, 0);
+  document.getElementById('grandAmt').textContent = fmtWon(grandTotal);
+  document.getElementById('grandAmt2').textContent = fmtWon(grandTotal);
+  document.getElementById('grandCnt').textContent = paid.length + '건';
+  document.getElementById('excludedNote').textContent =
+    free.length > 0 ? `(0원 · 기다리면무료 등 ${free.length}건은 총액에서 제외됨)` : '';
+  const now = new Date();
+  document.getElementById('rcptDate').textContent =
+    now.toLocaleDateString('ko-KR', {year:'numeric', month:'2-digit', day:'2-digit'}).replace(/\. /g,'.').replace(/\.$/,'') +
+    ' ' + now.toLocaleTimeString('ko-KR', {hour:'2-digit', minute:'2-digit', hour12:false});
+  document.getElementById('rcptNo').textContent =
+    String(Math.abs(grandTotal * 7 + paid.length)).slice(-6).padStart(6,'0');
+
+  // category totals
+  const catTotals = {};
+  CATS.forEach(c=>catTotals[c] = 0);
+  Object.entries(groups).forEach(([key,g])=>{
+    const cat = categoryMap[key] || '기타';
+    catTotals[cat] = (catTotals[cat]||0) + g.total;
+  });
+
+  const catSummary = document.getElementById('catSummary');
+  catSummary.innerHTML = '';
+  CATS.forEach(cat=>{
+    const val = catTotals[cat] || 0;
+    const pct = grandTotal > 0 ? Math.round(val/grandTotal*100) : 0;
+    const row = document.createElement('div');
+    row.className = 'sum-row';
+    row.innerHTML = `<span class="name">${cat}</span><span class="leader"></span><span class="pct">${pct}%</span><span class="val">${fmtWon(val)}</span>`;
+    catSummary.appendChild(row);
+  });
+
+  // sections per category
+  const sections = document.getElementById('sections');
+  sections.innerHTML = '';
+  CATS.forEach(cat=>{
+    const entries = Object.entries(groups).filter(([key])=> (categoryMap[key]||'기타') === cat);
+    if (entries.length === 0) return;
+    entries.sort((a,b)=> b[1].total - a[1].total);
+
+    const sec = document.createElement('div');
+    sec.className = 'section';
+    const total = entries.reduce((s,[,g])=>s+g.total,0);
+    sec.innerHTML = `<div class="section-head"><h2>${cat}</h2><div class="hl"></div><div class="total">${fmtWon(total)}</div></div>`;
+
+    entries.forEach(([key,g])=>{
+      const row = document.createElement('div');
+      row.className = 'item';
+      const countLabel = g.count > 1 ? ` <span class="meta">· 결제 ${g.count}건</span>` : '';
+      row.innerHTML = `
+        <div class="title">${key}${countLabel}
+          <div class="meta">${Array.from(g.payTypes).join(', ')}</div>
+        </div>
+        <select data-key="${encodeURIComponent(key)}"></select>
+        <div class="price">${fmtWon(g.total)}</div>
+      `;
+      const sel = row.querySelector('select');
+      CATS.forEach(c=>{
+        const opt = document.createElement('option');
+        opt.value = c; opt.textContent = c;
+        if (c === cat) opt.selected = true;
+        sel.appendChild(opt);
+      });
+      sel.onchange = async (e)=>{
+        categoryMap[key] = e.target.value;
+        await saveCategoryMap();
+        render();
+      };
+      sec.appendChild(row);
+    });
+    sections.appendChild(sec);
+  });
+
+  renderBarcode();
+  saveCategoryMap();
+}
+
+// file handling
+const drop = document.getElementById('drop');
+const fileInput = document.getElementById('fileInput');
+drop.addEventListener('click', ()=>fileInput.click());
+['dragover','dragenter'].forEach(ev=>drop.addEventListener(ev, e=>{ e.preventDefault(); drop.classList.add('drag'); }));
+['dragleave','drop'].forEach(ev=>drop.addEventListener(ev, e=>{ e.preventDefault(); drop.classList.remove('drag'); }));
+drop.addEventListener('drop', e=>{ handleFiles(e.dataTransfer.files); });
+fileInput.addEventListener('change', e=>{ handleFiles(e.target.files); });
+
+function handleFiles(fileListObj){
+  const files = Array.from(fileListObj).filter(f=>/\.html?$/i.test(f.name));
+  files.forEach(f=>{
+    const reader = new FileReader();
+    reader.onload = (ev)=>{
+      uploadedFiles.push({ name:f.name, text: ev.target.result });
+      renderFileList();
+      reprocess();
+    };
+    reader.readAsText(f, 'utf-8');
+  });
+}
+
+document.getElementById('dlCardBtn').addEventListener('click', async ()=>{
+  const btn = document.getElementById('dlCardBtn');
+  const original = btn.textContent;
+  btn.disabled = true; btn.textContent = '만드는 중...';
+  renderBarcode();
+  try{
+    const node = document.getElementById('summaryCard');
+    const canvas = await html2canvas(node, {
+      scale: 3,
+      backgroundColor: '#EFE6D3',
+      useCORS: true
+    });
+    const link = document.createElement('a');
+    link.download = '구매내역-요약카드.png';
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+  }catch(e){
+    console.error(e);
+    alert('이미지 생성에 실패했어요. 다시 시도해주세요.');
+  }
+  btn.disabled = false; btn.textContent = original;
+});
+
+document.getElementById('dlPdfBtn').addEventListener('click', async ()=>{
+  const btn = document.getElementById('dlPdfBtn');
+  const original = btn.textContent;
+  btn.disabled = true; btn.textContent = '만드는 중...';
+  // PDF에는 업로드 UI(도움말, 드롭존, 파일목록, 버튼 등)가 아니라
+  // 영수증 카드 + 항목 내역만 들어가야 하므로, 캡처 직전에만 숨긴다.
+  const hideEls = Array.from(document.querySelectorAll('.receipt .no-print'));
+  const prevDisplay = hideEls.map(el => el.style.display);
+  hideEls.forEach(el => { el.style.display = 'none'; });
+  try{
+    const node = document.querySelector('.receipt');
+    const canvas = await html2canvas(node, {
+      scale: 1.5,
+      backgroundColor: '#EFE6D3',
+      useCORS: true
+    });
+    const imgData = canvas.toDataURL('image/jpeg', 0.92);
+    const { jsPDF } = window.jspdf;
+    const pageWidth = 595.28; // A4 pt
+    const pageHeight = 841.89;
+    const imgWidth = pageWidth - 40;
+    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+    const pdf = new jsPDF('p', 'pt', 'a4');
+    const alias = 'ridi-ledger-capture'; // reuse the same decoded image across pages instead of re-embedding it each time
+
+    let heightLeft = imgHeight;
+    let position = 20;
+    pdf.addImage(imgData, 'JPEG', 20, position, imgWidth, imgHeight, alias, 'FAST');
+    heightLeft -= (pageHeight - 40);
+
+    while (heightLeft > 0){
+      position = heightLeft - imgHeight + 20;
+      pdf.addPage();
+      pdf.addImage(imgData, 'JPEG', 20, position, imgWidth, imgHeight, alias, 'FAST');
+      heightLeft -= (pageHeight - 40);
+    }
+    pdf.save('리디-구매내역.pdf');
+  }catch(e){
+    console.error(e);
+    alert('PDF 생성에 실패했어요. 항목 수가 아주 많다면 나눠서 다시 시도해보세요.');
+  } finally {
+    hideEls.forEach((el, i) => { el.style.display = prevDisplay[i]; });
+  }
+  btn.disabled = false; btn.textContent = original;
+});
+
+document.getElementById('resetBtn').addEventListener('click', ()=>{
+  uploadedFiles = [];
+  items = [];
+  renderFileList();
+  document.getElementById('results').style.display = 'none';
+  document.getElementById('emptyHint').style.display = 'block';
+});
+
+document.getElementById('copyPrompt').addEventListener('click', async ()=>{
+  const text = document.getElementById('chromePrompt').textContent;
+  const btn = document.getElementById('copyPrompt');
+  try{
+    await navigator.clipboard.writeText(text);
+    btn.textContent = '복사됨!';
+  }catch(e){
+    btn.textContent = '복사 실패';
+  }
+  setTimeout(()=>{ btn.textContent = '복사'; }, 1500);
+});
+
+loadCategoryMap();
+</script>
+</body>
+</html>
